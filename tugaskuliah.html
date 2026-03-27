@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Assistant</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #3b82f6, #9333ea);
+      margin: 0;
+      padding: 20px;
+      color: #1e293b;
+    }
+
+    h1 {
+      text-align: center;
+      color: white;
+    }
+
+    .container {
+      max-width: 750px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    input[type="file"] {
+      background: #f8fafc;
+    }
+
+    button {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .task {
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 12px;
+      margin-top: 10px;
+      border-left: 5px solid #3b82f6;
+    }
+
+    .urgent {
+      border-left: 5px solid red;
+      background: #fee2e2;
+    }
+
+    .deadline {
+      font-size: 14px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .done {
+      background: #dcfce7;
+      color: green;
+    }
+
+    .pending {
+      background: #fef9c3;
+      color: orange;
+    }
+
+    .progress-bar {
+      height: 10px;
+      background: #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress {
+      height: 100%;
+      background: #22c55e;
+      width: 0%;
+    }
+
+    #notif {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    a {
+      display: block;
+      margin-top: 5px;
+      color: #3b82f6;
+      text-decoration: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Student Assistant</h1>
+
+<div id="notif"></div>
+
+<div class="container">
+
+  <div class="card">
+    <h3>Tambah Tugas</h3>
+
+    <div class="form-grid">
+
+      <input id="judul" placeholder="Judul tugas" class="full">
+
+      <input id="deadline" type="date">
+      <input type="file" id="file">
+
+      <select id="status" class="full">
+        <option value="Belum">Belum Selesai</option>
+        <option value="Selesai">Selesai</option>
+      </select>
+
+      <button onclick="tambah()" class="full">+ Simpan</button>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Progress</h3>
+    <div class="progress-bar">
+      <div class="progress" id="progress"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Filter</h3>
+
+    <select onchange="filterTugas(this.value)">
+      <option value="semua">Semua</option>
+      <option value="Belum">Belum</option>
+      <option value="Selesai">Selesai</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h3>Daftar Tugas</h3>
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("tugas")) || [];
+let filter = "semua";
+
+function tambah(){
+  const judul = document.getElementById("judul").value;
+  const deadline = document.getElementById("deadline").value;
+  const status = document.getElementById("status").value;
+  const file = document.getElementById("file").files[0];
+
+  if(!judul || !deadline){
+    alert("Isi semua!");
+    return;
+  }
+
+  let fileURL = "", fileName = "";
+
+  if(file){
+    fileURL = URL.createObjectURL(file);
+    fileName = file.name;
+  }
+
+  data.push({ judul, deadline, status, fileURL, fileName });
+  localStorage.setItem("tugas", JSON.stringify(data));
+
+  tampil();
+}
+
+function tampil(){
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.sort((a,b)=> new Date(a.deadline) - new Date(b.deadline));
+
+  let tampilData = filter === "semua" ? data : data.filter(t => t.status === filter);
+
+  let selesai = data.filter(t=>t.status==="Selesai").length;
+  let persen = data.length ? (selesai/data.length)*100 : 0;
+  document.getElementById("progress").style.width = persen + "%";
+
+  tampilData.forEach((t,i)=>{
+    const deadline = new Date(t.deadline);
+    const selisih = (deadline - new Date())/(1000*60*60*24);
+
+    const div = document.createElement("div");
+    div.className = "task";
+
+    if(selisih <= 1 && selisih >= 0){
+      div.classList.add("urgent");
+    }
+
+    div.innerHTML = `
+      <b>${t.judul}</b><br>
+      <span class="deadline">📅 ${t.deadline}</span><br>
+
+      <span class="badge ${t.status==="Selesai"?"done":"pending"}">
+        ${t.status}
+      </span>
+
+      <br>
+      <select onchange="ubahStatus(${i}, this.value)">
+        <option ${t.status==="Belum"?"selected":""}>Belum</option>
+        <option ${t.status==="Selesai"?"selected":""}>Selesai</option>
+      </select>
+
+      ${t.fileURL ? `<a href="${t.fileURL}" target="_blank">📂 ${t.fileName}</a>` : ""}
+
+      <button onclick="hapus(${i})">Hapus</button>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+function ubahStatus(i, status){
+  data[i].status = status;
+  localStorage.setItem("tugas", JSON.stringify(data));
+  tampil();
+}
+
+function hapus(i){
+  data.splice(i,1);
+  localStorage.setItem("tugas", JSON.stringify(data));
+  tampil();
+}
+
+function filterTugas(v){
+  filter = v;
+  tampil();
+}
+
+function cekDeadline(){
+  const notif = document.getElementById("notif");
+
+  data.forEach(t=>{
+    const selisih = (new Date(t.deadline)-new Date())/(1000*60*60*24);
+
+    if(selisih <=1 && selisih >=0){
+      notif.innerText = "⚠️ Deadline dekat: " + t.judul;
+      notif.style.display = "block";
+
+      setTimeout(()=>{
+        notif.style.display = "none";
+      },3000);
+    }
+  });
+}
+
+tampil();
+cekDeadline();
+
+</script>
+
+</body>
+</html>
